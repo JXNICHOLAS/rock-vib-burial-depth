@@ -41,7 +41,7 @@ Install with:
 pip install numpy pandas scikit-learn matplotlib
 ```
 
-**MATLAB** (optional, for SVD processing only): Requires Polytec PSV software with COM/ActiveX support to read `.svd` files. Pre-processed NPZ files are included in `NPZ_data/`, so most users do not need MATLAB.
+**MATLAB** (optional, for SVD processing only): Requires Polytec PSV software with COM/ActiveX support to read `.svd` files. Pre-processed NPZ files are included in `NPZ_data/`. Users who want to access the raw source data will need both MATLAB and Polytec PSV software installed.
 
 ## Quickstart
 
@@ -74,7 +74,7 @@ python nn_LORO.py --no-plot
 
 Results (CSV and figures) are saved to `output/`.
 
-### Optional: Regenerate NPZ from Raw SVD
+### Optional: Regenerate NPZ from Raw SVD (MATLAB)
 
 If you have Polytec PSV software installed, you can regenerate the NPZ files from the raw SVD scans:
 
@@ -83,7 +83,7 @@ cd svd_processing
 PlotAverageSpectrumFromSVD_Batch
 ```
 
-This reads all `.svd` files under `svd_processing/RAW_data/` and writes `.npz` + `.png` files into `NPZ_data/`.
+This reads all `.svd` files under `svd_processing/RAW_data/` and writes `.npz` + `.png` files into `NPZ_data/`. The raw SVD files contain per-point frequency response data (H1 velocity/force, magnitude and phase) that can also be accessed directly using `GetPointData.m` for other signal types (e.g., displacement, real/imaginary components).
 
 ## Concrete Block Specifications
 
@@ -136,4 +136,4 @@ Binary Polytec PSV-500 scan files containing per-point H1 frequency response fun
 
 ## License
 
-Please contact the authors for licensing information.
+This project is licensed under the [MIT License](LICENSE).
