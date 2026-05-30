@@ -64,9 +64,6 @@ VARIANTS = {
     "+zeta+beta":  FEAT_ZETA_BETA,
 }
 
-# Columns that get negated for swap augmentation
-DIFF_COLS = ["w_diff", "fn_diff", "Mp_diff", "beta_diff", "zeta_diff"]
-
 TARGET = "h_cm"
 
 
@@ -167,17 +164,10 @@ def make_model(hidden_layers, activation, alpha, seed, lr, max_iter,
 # LORO cross-validation
 # ============================================================================
 def run_loro(df, features, model_kwargs):
-    """Run strict Leave-One-Rock-Out CV with swap augmentation."""
-    # Swap augmentation: negate all difference columns
-    df_swap = df.copy()
-    for col in DIFF_COLS:
-        if col in df_swap.columns:
-            df_swap[col] = -df[col]
-    df_aug = pd.concat([df, df_swap], ignore_index=True)
-
+    """Run strict Leave-One-Rock-Out CV."""
     loo_rows = []
     for rock_out in df["rock"].unique():
-        train = df_aug[df_aug["rock"] != rock_out]
+        train = df[df["rock"] != rock_out]
         test = df[df["rock"] == rock_out]
         model = make_model(**model_kwargs)
         model.fit(train[features].values, train[TARGET].values)
@@ -210,15 +200,9 @@ def compute_metrics(lr):
 # Permutation importance
 # ============================================================================
 def permutation_importance(df, features, model_kwargs, n_repeats=20):
-    """Train on full swap-augmented data, then shuffle each feature."""
-    df_swap = df.copy()
-    for col in DIFF_COLS:
-        if col in df_swap.columns:
-            df_swap[col] = -df[col]
-    df_aug = pd.concat([df, df_swap], ignore_index=True)
-
+    """Train on full dataset, then shuffle each feature."""
     model = make_model(**model_kwargs)
-    model.fit(df_aug[features].values, df_aug[TARGET].values)
+    model.fit(df[features].values, df[TARGET].values)
 
     X = df[features].values
     y = df[TARGET].values
