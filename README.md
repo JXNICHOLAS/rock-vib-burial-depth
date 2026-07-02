@@ -4,7 +4,7 @@ This repository contains data and code for the paper:
 
 > Y. Ruan and E. Komendera, "Burial Depth Estimation for Partially Embedded Rocks Using Scanning Laser Doppler Vibrometry and Neural Networks," submitted to *IEEE Sensors Journal*, 2026.
 
-A vibration-based pipeline estimates how deeply a rock is buried in granular soil. An instrumented hammer excites the rock, a scanning laser Doppler vibrometer records the frequency response, and eleven physically interpretable features (resonance frequency, peak mobility, half-power damping ratio, spatial vibration decay, exposed height, and cross-section width, encoded as mean/difference pairs from two orthogonal strikes) are mapped to burial depth by a Multilayer Perceptron. Under strict Leave-One-Rock-Out cross-validation on 16 concrete blocks (90 paired samples from 180 measurements), the model achieves 24.4% MAPE and 1.02 cm RMSE.
+A vibration-based pipeline estimates how deeply a rock is buried in granular soil. An instrumented hammer excites the rock, a scanning laser Doppler vibrometer records the frequency response, and eleven physically interpretable features (resonance frequency, peak mobility, half-power damping ratio, spatial vibration decay, exposed height, and cross-section width, encoded as mean/difference pairs from two orthogonal strikes) are mapped to burial depth by a Multilayer Perceptron. Under strict Leave-One-Rock-Out cross-validation on 16 concrete blocks (90 paired samples from 180 measurements), the model achieves 25.6% MAPE and 1.06 cm RMSE.
 
 ## Repository Structure
 
