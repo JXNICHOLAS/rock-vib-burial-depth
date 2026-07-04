@@ -1,6 +1,6 @@
 # Burial Depth Estimation for Partially Embedded Rocks Using Scanning Laser Doppler Vibrometry and Neural Networks
 
-This repository contains data and code for the paper:
+This repository contains the data and code for the paper:
 
 > Y. Ruan and E. Komendera, "Burial Depth Estimation for Partially Embedded Rocks Using Scanning Laser Doppler Vibrometry and Neural Networks," submitted to *IEEE Sensors Journal*, 2026.
 
