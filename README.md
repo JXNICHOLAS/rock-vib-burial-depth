@@ -4,7 +4,16 @@ This repository contains the data and code for the paper:
 
 > Y. Ruan and E. Komendera, "Burial Depth Estimation for Partially Embedded Rocks Using Scanning Laser Doppler Vibrometry and Neural Networks," submitted to *IEEE Sensors Journal*, 2026.
 
-A vibration-based pipeline estimates how deeply a rock is buried in granular soil. An instrumented hammer excites the rock, a scanning laser Doppler vibrometer records the frequency response, and eleven physically interpretable features (resonance frequency, peak mobility, half-power damping ratio, spatial vibration decay, exposed height, and cross-section width, encoded as mean/difference pairs from two orthogonal strikes) are mapped to burial depth by a Multilayer Perceptron. Under strict Leave-One-Rock-Out cross-validation on 16 concrete blocks (90 paired samples from 180 measurements), the model achieves 25.6% MAPE and 1.06 cm RMSE.
+A geometry-informed, vibration-based pipeline estimates how deeply a rock is buried in granular soil. An instrumented hammer excites the rock, a scanning laser Doppler vibrometer records the frequency response, and eleven physically interpretable features (resonance frequency, peak mobility, half-power damping ratio, spatial vibration decay, exposed height, and cross-section width, encoded as mean/difference pairs from two orthogonal strikes) are mapped to burial depth by a Multilayer Perceptron.
+
+**Canonical results** (strict Leave-One-Rock-Out cross-validation on 16 concrete blocks; 90 paired samples from 180 measurements; seeds 0–19):
+
+| Protocol | h MAPE | h RMSE |
+|---|---|---|
+| **Nested hyperparameter selection** (`nested_cv.py`, paper headline) | **28.4 ± 1.4%** | **1.12 cm** |
+| Fixed reference configuration (16,8)/tanh/α=5 (`nn_LORO.py`; selection-biased, used for relative comparisons only) | 25.3 ± 0.4% | 1.03 cm |
+
+The +3.1-point difference is the model-selection bias quantified in the paper (Section VI–VII). As reference points under the same nested protocol: the known-mass closed-form inversion of Jia et al. reaches 47.0% MAPE (`baseline_jia.py`), the raw-pairs input encoding 31.8% (`nested_cv.py --encoding rawpairs`), Gaussian Process 32.8%, Random Forest 47.9%, and Gradient Boosting 50.3% (`nested_alt_regressors.py`).
 
 ## Repository Structure
 
@@ -15,7 +24,20 @@ rock-vib-burial-depth/
 │   ├── 05_14_r1_z_75_b_1_fn...Hz_frame_0.npz
 │   └── ...
 ├── make_training_dataset.py               # Step 1: NPZ -> training_dataset.csv
-├── nn_LORO.py                             # Step 2: LORO evaluation + figure generation
+├── nn_LORO.py                             # Step 2: LORO evaluation + figure generation (fixed config)
+├── paired_dataset.py                      # Shared loader for the scripts below
+├── nested_cv.py                           # Nested CV (paper headline result; also --encoding rawpairs)
+├── grid_search.py                         # 90-config grid search (selection step; see bias caveat)
+├── baseline_jia.py                        # Known-mass closed-form physics baseline (Table V of the paper)
+├── nested_alt_regressors.py               # GP / RF / GB under the nested protocol (Table V of the paper)
+├── error_characteristics.py               # Bias, worst-case, quartile, failure-rate analysis + figure
+├── plot_nested_results.py                 # Regenerates paper Figs. 4-5 from nested_cv.py output
+├── comparison/                            # Table V encoding/architecture alternatives
+│   ├── nn_raw_pairs.py                    #   raw-pairs encoding (fixed config)
+│   ├── nn_single_dir.py                   #   single-direction benchmark (Table II)
+│   ├── nn_deepsets.py                     #   DeepSets / Siamese (requires PyTorch)
+│   ├── nn_transformer.py                  #   Transformer-S/M (requires PyTorch)
+│   └── grid_search_deepsets.py            #   DeepSets grid search (requires PyTorch)
 └── svd_processing/                        # Optional: regenerate NPZ from raw SVD
     ├── RAW_data/                          #   180 raw SVD files (Polytec PSV-500)
     │   ├── r1_65_80_93_w960/              #   Folder: r<ID>_<x>_<y>_<z>_w<weight_g>
@@ -34,12 +56,15 @@ numpy
 pandas
 scikit-learn
 matplotlib
+joblib
 ```
 
 Install with:
 ```bash
-pip install numpy pandas scikit-learn matplotlib
+pip install numpy pandas scikit-learn matplotlib joblib
 ```
+
+**PyTorch** (optional): only required for the DeepSets/Siamese and Transformer comparisons in `comparison/`.
 
 **MATLAB** (optional, for SVD processing only): Requires Polytec PSV software with COM/ActiveX support to read `.svd` files. Pre-processed NPZ files are included in `NPZ_data/`. Users who want to access the raw source data will need both MATLAB and Polytec PSV software installed.
 
@@ -73,6 +98,26 @@ python nn_LORO.py --no-plot
 ```
 
 Results (CSV and figures) are saved to `output/`.
+
+### Step 3: Nested Cross-Validation (paper headline result)
+
+```bash
+# Nested hyperparameter selection (mean/diff encoding, paper model):
+python nested_cv.py
+
+# Raw-pairs encoding under the same nested protocol:
+python nested_cv.py --encoding rawpairs
+
+# Physics baseline, alternative regressors, and error analysis:
+python baseline_jia.py
+python nested_alt_regressors.py
+python error_characteristics.py     # requires nested_cv.py output
+python plot_nested_results.py       # paper Figs. 4-5; requires nested_cv.py output
+```
+
+Note: `nested_cv.py` refits 90 configurations inside every LORO fold and takes
+roughly an hour on a 16-core machine; per-fold selections are checkpointed to
+`output/` and the script resumes if interrupted.
 
 ### Optional: Regenerate NPZ from Raw SVD (MATLAB)
 
