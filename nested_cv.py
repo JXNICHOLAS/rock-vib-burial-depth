@@ -4,24 +4,28 @@ nested_cv.py
 ============
 Nested Leave-One-Rock-Out cross-validation for the burial-depth estimator
 (paper Section VI-C). This is the protocol behind the paper's headline
-result (28.4 +/- 1.4 % MAPE, 1.12 cm RMSE for the mean/diff encoding).
+result: 25.1 +/- 1.0 % MAPE / 0.94 +/- 0.03 cm RMSE for the eleven-feature
+mean/difference encoding (raw-pairs alternative: 27.1 +/- 0.9 %).
 
-Motivation: the fixed reference configuration (16,8)/tanh/alpha=5 was
-originally chosen by a grid search scored on the same LORO folds used for
-evaluation (see grid_search.py), which optimistically biases the error
-estimate (Varma & Simon 2006; Cawley & Talbot 2010). Here, hyperparameters
-are instead selected INSIDE each training fold:
+Hyperparameters are selected INSIDE each training fold so the held-out
+rock never influences selection (Varma & Simon 2006; Cawley & Talbot 2010):
 
-  OUTER: strict LORO (16 folds; all measurements of one rock held out).
-  INNER: 5-fold cross-validation grouped by rock on the 15 training rocks,
-         over the same 90-configuration grid. The held-out rock never
-         influences selection.
+  OUTER: strict LORO (18 folds; all measurements of one rock held out).
+  INNER: 5-fold cross-validation grouped by rock on the 17 training rocks,
+         over a 96-configuration grid concentrated on small tanh networks
+         by preliminary training-fold experiments (paper Sec. VI-C).
   The inner-selected configuration is refit on all training rocks and
   predicts the held-out rock; outer predictions are averaged over seeds.
 
 Usage:
-  python nested_cv.py                      # mean/diff encoding (paper model)
-  python nested_cv.py --encoding rawpairs  # raw-pairs encoding
+  python nested_cv.py                          # meandiff11 (paper model)
+  python nested_cv.py --encoding raw11         # raw-pairs comparison row
+  python nested_cv.py --encoding meandiff9     # damping-only candidate
+  python nested_cv.py --encoding meandiff_beta9  # spatial-only candidate
+  python nested_cv.py --deploy                 # inner rule on ALL 18 rocks
+                                               # -> named deployed config
+  (feature_set_selector.py assembles the paper's feature-set sensitivity
+   analysis from the three meandiff runs; results/ ships canonical outputs)
 
 Outputs (to ./output/):
   nested_selected_configs_<enc>.csv  — per-fold selected configuration
@@ -42,15 +46,28 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from paired_dataset import load_paired, FEAT_MEANDIFF, FEAT_RAWPAIRS, TARGET
+from paired_dataset import (load_paired, FEAT_RAW9, FEAT_RAW11,
+                            FEAT_MEANDIFF9, FEAT_MEANDIFF11,
+                            FEAT_MEANDIFF_B9, TARGET)
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 BASE = Path(__file__).resolve().parent
 
-HIDDEN = [(4,), (8,), (16,), (4, 2), (8, 4), (16, 8), (32, 16), (8, 4, 2), (16, 8, 4)]
-ACTS = ["tanh", "relu"]
-ALPHAS = [0.1, 0.5, 1.0, 5.0, 10.0]
+# meandiff9 / meandiff_beta9 / meandiff11 are the three candidate feature
+# sets of the paper's feature-set sensitivity analysis (assembled by
+# feature_set_selector.py); meandiff11 vs raw11 is the paper's input
+# encoding comparison. raw9 is retained for completeness.
+ENCODINGS = {"raw9": FEAT_RAW9, "raw11": FEAT_RAW11,
+             "meandiff9": FEAT_MEANDIFF9, "meandiff11": FEAT_MEANDIFF11,
+             "meandiff_beta9": FEAT_MEANDIFF_B9}
+
+HIDDEN = [(8,), (12,),
+          (4, 2), (6, 3), (8, 4), (10, 5), (12, 6), (16, 8), (20, 10), (24, 12),
+          (8, 8), (16, 16),
+          (8, 4, 2), (12, 6, 3), (16, 8, 4), (24, 12, 6)]
+ACTS = ["tanh"]
+ALPHAS = [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
 GRID = list(itertools.product(HIDDEN, ACTS, ALPHAS))
 SEL_SEED = 0
 OUTER_SEEDS = range(20)
@@ -91,11 +108,25 @@ def select_fold(df, features, rock_out):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--encoding", choices=["meandiff", "rawpairs"],
-                   default="meandiff")
+    p.add_argument("--encoding", choices=sorted(ENCODINGS), default="meandiff11")
     p.add_argument("--jobs", type=int, default=-1)
+    p.add_argument("--deploy", action="store_true",
+                   help="apply the inner-selection rule to ALL 18 rocks and "
+                        "print the deployed configuration (no outer eval)")
     args = p.parse_args()
-    features = FEAT_MEANDIFF if args.encoding == "meandiff" else FEAT_RAWPAIRS
+    features = ENCODINGS[args.encoding]
+
+    if args.deploy:
+        df = load_paired()
+        scores = Parallel(n_jobs=args.jobs, verbose=5)(
+            delayed(inner_score)(df, features, h, a, al) for (h, a, al) in GRID)
+        order = np.argsort(scores)
+        print(f"\nDeployed configuration ({args.encoding}), inner rule on all "
+              f"{df['rock'].nunique()} rocks:")
+        for i in order[:5]:
+            h, a, al = GRID[i]
+            print(f"  {str(h):>12} {a} alpha={al:<4}  inner={scores[i]:.1f}%")
+        return
 
     out = BASE / "output"
     out.mkdir(exist_ok=True)

@@ -4,46 +4,51 @@ This repository contains the data and code for the paper:
 
 > Y. Ruan and E. Komendera, "Burial Depth Estimation for Partially Embedded Rocks Using Scanning Laser Doppler Vibrometry and Neural Networks," submitted to *IEEE Sensors Journal*, 2026.
 
-A geometry-informed, vibration-based pipeline estimates how deeply a rock is buried in granular soil. An instrumented hammer excites the rock, a scanning laser Doppler vibrometer records the frequency response, and eleven physically interpretable features (resonance frequency, peak mobility, half-power damping ratio, spatial vibration decay, exposed height, and cross-section width, encoded as mean/difference pairs from two orthogonal strikes) are mapped to burial depth by a Multilayer Perceptron.
+A geometry-informed, vibration-based pipeline estimates how deeply a rock is buried in granular soil. An instrumented hammer excites the rock in two orthogonal directions, a scanning laser Doppler vibrometer records the frequency response, and eleven physically interpretable features (cross-section width, exposed height, resonance frequency, peak mobility, half-power damping ratio, and spatial vibration decay slope, encoded as mean/difference pairs from the two strike directions) are mapped to burial depth by a Multilayer Perceptron.
 
-**Canonical results** (strict Leave-One-Rock-Out cross-validation on 16 concrete blocks; 90 paired samples from 180 measurements; seeds 0–19):
+**Canonical results** (strict Leave-One-Rock-Out cross-validation on 18 concrete blocks; 102 paired samples from 204 measurements; seeds 0–19; hyperparameter selection confined to training folds, with the feature-set composition supported by a training-fold sensitivity analysis):
 
 | Protocol | h MAPE | h RMSE |
 |---|---|---|
-| **Nested hyperparameter selection** (`nested_cv.py`, paper headline) | **28.4 ± 1.4%** | **1.12 cm** |
-| Fixed reference configuration (16,8)/tanh/α=5 (`nn_LORO.py`; selection-biased, used for relative comparisons only) | 25.3 ± 0.4% | 1.03 cm |
+| **Nested selection, eleven mean/difference features** (`nested_cv.py`, paper headline) | **25.1 ± 1.0%** | **0.94 ± 0.03 cm** |
+| Nested selection, raw-pairs encoding (`nested_cv.py --encoding raw11`) | 27.1 ± 0.9% | 1.074 cm |
+| Fixed reference configuration (16,8,4)/tanh/α=5 (`nn_LORO.py`; used for matched relative comparisons only) | 22.6 ± 0.8% | 0.881 cm |
 
-The +3.1-point difference is the model-selection bias quantified in the paper (Section VI–VII). As reference points under the same nested protocol: the known-mass closed-form inversion of Jia et al. reaches 47.0% MAPE (`baseline_jia.py`), the raw-pairs input encoding 31.8% (`nested_cv.py --encoding rawpairs`), Gaussian Process 32.8%, Random Forest 47.9%, and Gradient Boosting 50.3% (`nested_alt_regressors.py`).
+The feature-set sensitivity analysis (`feature_set_selector.py`) selects the combined eleven-feature set in 10 of 18 outer folds and the damping-only set in 8, never the spatial-slope-only set; the deployed configuration named by applying the inner rule to all 18 rocks is (4,2)/tanh/α=3 (`nested_cv.py --deploy`). The known-mass closed-form inversion of Jia et al. (true mass supplied, per-fold calibrated soil constant) reaches 45.9% MAPE (`baseline_jia.py`). Under the same nested protocol with the same eleven inputs, Gaussian Process reaches 39.6%, Random Forest 45.2%, and Gradient Boosting 40.6% (`nested_alt_regressors.py`); deterministic linear regression (LORO evaluation, no hyperparameter selection) reaches 31.6%. The single-measurement benchmark at the fixed configuration is 29.6% (`comparison/nn_single_dir.py`); the encoding comparison is assembled by `encoding_selector.py` (requires the meandiff11 and raw11 runs).
 
 ## Repository Structure
 
 ```
 rock-vib-burial-depth/
 ├── README.md
-├── NPZ_data/                              # 180 pre-processed NPZ files (start here)
+├── NPZ_data/                              # 204 pre-processed NPZ files (start here)
 │   ├── 05_14_r1_z_75_b_1_fn...Hz_frame_0.npz
 │   └── ...
 ├── make_training_dataset.py               # Step 1: NPZ -> training_dataset.csv
-├── nn_LORO.py                             # Step 2: LORO evaluation + figure generation (fixed config)
-├── paired_dataset.py                      # Shared loader for the scripts below
-├── nested_cv.py                           # Nested CV (paper headline result; also --encoding rawpairs)
-├── grid_search.py                         # 90-config grid search (selection step; see bias caveat)
-├── baseline_jia.py                        # Known-mass closed-form physics baseline (Table V of the paper)
-├── nested_alt_regressors.py               # GP / RF / GB under the nested protocol (Table V of the paper)
+├── nn_LORO.py                             # Step 2: fixed-config ablation + figures (Table II)
+├── paired_dataset.py                      # Shared loader (orientation-aware widths, both encodings)
+├── nested_cv.py                           # Nested CV (paper headline; encodings meandiff11/raw11/meandiff9/meandiff_beta9/raw9; --deploy)
+├── encoding_selector.py                   # Nested encoding comparison (meandiff11 vs raw11) from nested_cv.py outputs
+├── feature_set_selector.py                # Feature-set sensitivity analysis (288 candidates/fold) from nested_cv.py outputs
+├── results/                               # Canonical artifacts backing the paper: selection tables + per-sample predictions
+├── grid_search.py                         # 96-config screening search (see bias caveat in file)
+├── baseline_jia.py                        # Known-mass closed-form physics baseline (Table V)
+├── linear_baselines.py                    # Deterministic linear/polynomial/dummy baselines (Table V)
+├── nested_alt_regressors.py               # GP / RF / GB, eleven mean/diff inputs, nested protocol (Table V)
 ├── error_characteristics.py               # Bias, worst-case, quartile, failure-rate analysis + figure
 ├── plot_nested_results.py                 # Regenerates paper Figs. 4-5 from nested_cv.py output
-├── comparison/                            # Table V encoding/architecture alternatives
-│   ├── nn_raw_pairs.py                    #   raw-pairs encoding (fixed config)
-│   ├── nn_single_dir.py                   #   single-direction benchmark (Table II)
-│   ├── nn_deepsets.py                     #   DeepSets / Siamese (requires PyTorch)
-│   ├── nn_transformer.py                  #   Transformer-S/M (requires PyTorch)
-│   └── grid_search_deepsets.py            #   DeepSets grid search (requires PyTorch)
+├── comparison/
+│   ├── nn_single_dir.py                   #   single-direction benchmark (Table II, last row)
+│   ├── nn_raw_pairs.py                    #   legacy fixed-config raw-pairs exploration
+│   ├── nn_deepsets.py                     #   legacy DeepSets / Siamese exploration (requires PyTorch)
+│   ├── nn_transformer.py                  #   legacy Transformer exploration (requires PyTorch)
+│   └── grid_search_deepsets.py            #   legacy (requires PyTorch)
 └── svd_processing/                        # Optional: regenerate NPZ from raw SVD
-    ├── RAW_data/                          #   180 raw SVD files (Polytec PSV-500)
+    ├── RAW_data/                          #   204 raw SVD files (Polytec PSV-500)
     │   ├── r1_65_80_93_w960/              #   Folder: r<ID>_<x>_<y>_<z>_w<weight_g>
     │   │   ├── 05_14_r1_z_75_b_1.svd     #   File:   <MM>_<DD>_r<ID>_<axis>_<burial%>_<face>_<run>.svd
     │   │   └── ...
-    │   └── ...                            #   16 rock folders
+    │   └── ...                            #   18 rock folders
     ├── PlotAverageSpectrumFromSVD_Batch.m #   SVD -> NPZ (requires Polytec PSV software)
     └── GetPointData.m                     #   Helper for the MATLAB script
 ```
@@ -81,17 +86,17 @@ This reads all `.npz` files in `NPZ_data/`, extracts metadata and features, and 
 ### Step 2: Run LORO Evaluation (Python)
 
 ```bash
-# Run the paper's 11-feature model (default):
+# Run the paper's proposed eleven-feature set at the fixed reference config:
 python nn_LORO.py
 
-# Run all feature-set variants for comparison:
+# Run the full ablation ladder (Table II):
 python nn_LORO.py --variant all
 
 # Run only the 7-feature baseline:
 python nn_LORO.py --variant baseline
 
 # Custom hyperparameters:
-python nn_LORO.py --alpha 5.0 --hidden-layers 16 8 --seed 0
+python nn_LORO.py --alpha 5.0 --hidden-layers 16 8 4 --seed 0
 
 # Skip figure generation:
 python nn_LORO.py --no-plot
@@ -102,20 +107,32 @@ Results (CSV and figures) are saved to `output/`.
 ### Step 3: Nested Cross-Validation (paper headline result)
 
 ```bash
-# Nested hyperparameter selection (mean/diff encoding, paper model):
+# Nested hyperparameter selection (eleven mean/difference features, paper model):
 python nested_cv.py
 
-# Raw-pairs encoding under the same nested protocol:
-python nested_cv.py --encoding rawpairs
+# Raw-pairs encoding comparison under the same nested protocol:
+python nested_cv.py --encoding raw11
+
+# Feature-set candidates for the sensitivity analysis:
+python nested_cv.py --encoding meandiff9
+python nested_cv.py --encoding meandiff_beta9
+
+# Analyses assembled from the runs above (no retraining):
+python feature_set_selector.py   # damping / beta / combined per fold (paper)
+python encoding_selector.py      # meandiff11 vs raw11 per fold
+
+# Named deployed configuration (inner rule on all 18 rocks):
+python nested_cv.py --deploy
 
 # Physics baseline, alternative regressors, and error analysis:
 python baseline_jia.py
+python linear_baselines.py
 python nested_alt_regressors.py
 python error_characteristics.py     # requires nested_cv.py output
 python plot_nested_results.py       # paper Figs. 4-5; requires nested_cv.py output
 ```
 
-Note: `nested_cv.py` refits 90 configurations inside every LORO fold and takes
+Note: `nested_cv.py` refits 96 configurations inside every LORO fold and takes
 roughly an hour on a 16-core machine; per-fold selections are checkpointed to
 `output/` and the script resumes if interrupted.
 
@@ -150,6 +167,8 @@ This reads all `.svd` files under `svd_processing/RAW_data/` and writes `.npz` +
 | r15   | 62.6     | 91.4     | 122.5    | 1347       | 1.92            | 20--75%       |
 | r16   | 52.0     | 63.4     | 69.2     | 445        | 1.95            | 25--50%       |
 | r17   | 49.0     | 81.0     | 110.0    | 874        | 2.00            | 25--75%       |
+| r18   | 69.0     | 92.5     | 94.7     | 1185       | 1.96            | 25--75%       |
+| r19   | 75.5     | 92.3     | 100.8    | 1353       | 1.93            | 25--75%       |
 
 ## Data Format
 

@@ -7,7 +7,7 @@
 %   File   : <MM>_<DD>_r<N>_<axis>_<burial_pct>_<face>_<run>.svd
 %              axis  = x (horizontal scan) | z (vertical into sand)
 %              face  = which edge of the rock faces the scanner
-%              b/s   = buried / surface
+%              b/s   = strike direction: larger / smaller horizontal face
 %
 % NPZ stores spectrum + all parsed metadata fields.
 % PNG title shows rock dimensions, weight, and measurement setup.

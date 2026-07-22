@@ -3,18 +3,19 @@
 grid_search.py
 ==============
 Flat grid search over MLP hyperparameters, scored by mean LORO error
-(90 configurations: 9 hidden-layer sizes x 2 activations x 5 alphas).
+(96 configurations: 16 tanh hidden-layer shapes x 6 alphas — the refined
+grid of paper Sec. VI-C, applied to the eleven-feature mean/difference encoding).
 
-This is the selection procedure that originally identified the fixed
-reference configuration (16,8)/tanh/alpha=5 reported in the paper.
+This is the style of preliminary screening that identified the fixed
+reference configuration (16,8,4)/tanh/alpha=5 used for the paper's
+matched ablation comparisons.
 
 IMPORTANT CAVEAT (paper Section VI): because this search scores each
-configuration on the same LORO folds used for evaluation, using the
-winning configuration's score as a generalization estimate is
-optimistically biased (Varma & Simon 2006; Cawley & Talbot 2010). For the
-paper's dataset the bias was measured at +3.1 percentage points MAPE.
-Use nested_cv.py for an unbiased estimate; this script is provided for
-transparency and reproducibility of the selection step only.
+configuration on the same LORO folds used for evaluation, a winning
+configuration's score is NOT a valid generalization estimate (Varma &
+Simon 2006; Cawley & Talbot 2010). Absolute performance in the paper
+comes from nested_cv.py, where selection is confined to training folds;
+this script is provided for transparency of the screening step only.
 
 Usage:
   python grid_search.py                 # 3 seeds (fast screening)
@@ -34,15 +35,18 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from paired_dataset import load_paired, FEAT_MEANDIFF, TARGET
+from paired_dataset import load_paired, FEAT_MEANDIFF11, TARGET
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 BASE = Path(__file__).resolve().parent
 
-HIDDEN = [(4,), (8,), (16,), (4, 2), (8, 4), (16, 8), (32, 16), (8, 4, 2), (16, 8, 4)]
-ACTS = ["tanh", "relu"]
-ALPHAS = [0.1, 0.5, 1.0, 5.0, 10.0]
+HIDDEN = [(8,), (12,),
+          (4, 2), (6, 3), (8, 4), (10, 5), (12, 6), (16, 8), (20, 10), (24, 12),
+          (8, 8), (16, 16),
+          (8, 4, 2), (12, 6, 3), (16, 8, 4), (24, 12, 6)]
+ACTS = ["tanh"]
+ALPHAS = [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
 GRID = list(itertools.product(HIDDEN, ACTS, ALPHAS))
 
 
@@ -62,9 +66,9 @@ def loro_mape(df, hidden, act, alpha, seed):
         tr = df[df["rock"] != r]
         te = df[df["rock"] == r]
         m = make_model(hidden, act, alpha, seed)
-        m.fit(tr[FEAT_MEANDIFF].values, tr[TARGET].values)
+        m.fit(tr[FEAT_MEANDIFF11].values, tr[TARGET].values)
         yt.extend(te[TARGET].values)
-        yp.extend(m.predict(te[FEAT_MEANDIFF].values))
+        yp.extend(m.predict(te[FEAT_MEANDIFF11].values))
     yt = np.array(yt)
     yp = np.array(yp)
     return (float(np.mean(np.abs(yt - yp) / yt) * 100),
@@ -85,7 +89,7 @@ def main():
     args = p.parse_args()
 
     df = load_paired()
-    print(f"Grid: {len(GRID)} configs x {args.seeds} seeds x 16 LORO folds")
+    print(f"Grid: {len(GRID)} configs x {args.seeds} seeds x 18 LORO folds")
     t0 = time.time()
     records = Parallel(n_jobs=args.jobs, verbose=5)(
         delayed(eval_config)(df, h, a, al, args.seeds) for (h, a, al) in GRID)

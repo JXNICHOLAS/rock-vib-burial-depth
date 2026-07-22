@@ -10,7 +10,8 @@ hyperparameter grid selected per fold by rock-grouped 5-fold inner CV:
   RF : depth {None,4,8} x min_leaf {1,2,4} x max_features {1.0,'sqrt'}  (18)
   GB : n_est {100,300} x depth {1,2,3} x lr {0.03,0.1} x subsample {0.8,1.0} (24)
 
-Paper results: GP 32.8%, RF 47.9%, GB 50.3% MAPE (vs MLP 28.4%).
+Paper results (eleven mean/difference features, 18 rocks): GP 39.6%,
+RF 45.2%, GB 40.6% MAPE (vs MLP 25.1% / 0.94 cm).
 """
 import time
 import warnings
@@ -27,12 +28,12 @@ from sklearn.model_selection import GroupKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from paired_dataset import load_paired, FEAT_MEANDIFF, TARGET
+from paired_dataset import load_paired, FEAT_MEANDIFF11, TARGET
 
 warnings.filterwarnings("ignore")
 
 BASE = Path(__file__).resolve().parent
-NFEAT = len(FEAT_MEANDIFF)
+NFEAT = len(FEAT_MEANDIFF11)
 SEL_SEED = 0
 OUTER_SEEDS = range(20)
 
@@ -84,7 +85,7 @@ def mape(yt, yp):
 
 
 def inner_score(train_df, make):
-    X = train_df[FEAT_MEANDIFF].values
+    X = train_df[FEAT_MEANDIFF11].values
     y = train_df[TARGET].values
     g = train_df["rock"].values
     errs = []
@@ -116,9 +117,9 @@ def run_model(df, name, grid, jobs):
             tr = df[df["rock"] != r]
             te = df[df["rock"] == r]
             m = sel[r](seed)
-            m.fit(tr[FEAT_MEANDIFF].values, tr[TARGET].values)
+            m.fit(tr[FEAT_MEANDIFF11].values, tr[TARGET].values)
             yt.extend(te[TARGET].values)
-            yp.extend(m.predict(te[FEAT_MEANDIFF].values))
+            yp.extend(m.predict(te[FEAT_MEANDIFF11].values))
         yt = np.array(yt)
         yp = np.array(yp)
         return mape(yt, yp), float(np.sqrt(np.mean((yt - yp) ** 2)))
@@ -130,7 +131,7 @@ def run_model(df, name, grid, jobs):
           f"RMSE {np.mean(rs):.3f} +/- {np.std(rs):.3f} cm   "
           f"({(time.time() - t0)/60:.1f} min)")
     for tag, n in pd.Series(list(tags.values())).value_counts().items():
-        print(f"    {n:2d}/16  {tag}")
+        print(f"    {n:2d}/{len(rocks)}  {tag}")
     return dict(model=name, mape=np.mean(ms), mape_std=np.std(ms),
                 rmse=np.mean(rs), rmse_std=np.std(rs))
 
@@ -141,7 +142,7 @@ def main():
     out.mkdir(exist_ok=True)
     rows = [run_model(df, name, grid, jobs=-1) for name, grid in GRIDS.items()]
     pd.DataFrame(rows).to_csv(out / "nested_alt_regressors.csv", index=False)
-    print("\nReference: nested MLP (mean/diff) = 28.4 +/- 1.4 % / 1.117 cm")
+    print("\nReference: nested MLP (meandiff11) = 25.1 +/- 1.0 % / 0.94 cm")
 
 
 if __name__ == "__main__":

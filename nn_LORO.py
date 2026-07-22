@@ -9,19 +9,25 @@ This is the main evaluation script for the paper:
   "Burial Depth Estimation for Partially Embedded Rocks Using
    Scanning Laser Doppler Vibrometry and Neural Networks"
 
+Fixed-configuration ablation at the paper's matched reference
+(16, 8, 4)/tanh/alpha=5 with the mean/difference encoding (Table II):
+48.4 (baseline) / 24.4 (+zeta) / 37.6 (+beta) / 22.6 (+zeta+beta) % MAPE.
+For the headline (absolute) estimate use nested_cv.py instead.
+
 Usage
 -----
-  # Run the paper's 11-feature model (default):
+  # Run the paper's proposed eleven-feature set (default):
   python nn_LORO.py
 
-  # Run a specific variant:
+  # Run a specific ablation rung:
   python nn_LORO.py --variant baseline
   python nn_LORO.py --variant +zeta
   python nn_LORO.py --variant +beta
-  python nn_LORO.py --variant +zeta+beta   # (default, paper model)
+  python nn_LORO.py --variant +zeta+beta   # (default, proposed feature set)
+  python nn_LORO.py --variant all
 
   # Custom hyperparameters:
-  python nn_LORO.py --alpha 5.0 --hidden-layers 16 8 --seed 0
+  python nn_LORO.py --alpha 5.0 --hidden-layers 16 8 4 --seed 0
 
   # Skip plot generation:
   python nn_LORO.py --no-plot
@@ -35,6 +41,7 @@ import argparse
 import sys
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -44,8 +51,10 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
+from paired_dataset import load_paired, TARGET
+
 # ============================================================================
-# Feature set definitions
+# Feature set definitions (mean/difference encoding, paper Table II)
 # ============================================================================
 FEAT_BASELINE = ["w_mean", "fn_mean", "Mp_mean", "he",
                  "w_diff", "fn_diff", "Mp_diff"]
@@ -55,7 +64,7 @@ FEAT_ZETA = FEAT_BASELINE + ["zeta_mean", "zeta_diff"]
 FEAT_BETA = FEAT_BASELINE + ["beta_mean", "beta_diff"]
 
 FEAT_ZETA_BETA = FEAT_BASELINE + ["zeta_mean", "zeta_diff",
-                                   "beta_mean", "beta_diff"]
+                                  "beta_mean", "beta_diff"]   # proposed model
 
 VARIANTS = {
     "baseline":    FEAT_BASELINE,
@@ -63,81 +72,6 @@ VARIANTS = {
     "+beta":       FEAT_BETA,
     "+zeta+beta":  FEAT_ZETA_BETA,
 }
-
-TARGET = "h_cm"
-
-
-# ============================================================================
-# Data loading: build paired dataset from training_dataset.csv
-# ============================================================================
-def load_paired_dataset(csv_path):
-    """Read per-measurement CSV and return paired (b + s) DataFrame."""
-    raw = pd.read_csv(csv_path)
-    raw = raw.dropna(subset=["fn_peak_Hz", "fn_halfpower_Hz", "damping_ratio",
-                              "npz_file", "axis1_cm", "axis2_cm", "axis3_cm",
-                              "h_cm", "Hs_cm", "M_kg", "direction", "burial_pct",
-                              "mag_gradient"])
-    raw["fn_avg_Hz"] = (raw["fn_peak_Hz"] + raw["fn_halfpower_Hz"]) / 2
-
-    # Load peak magnitude from NPZ
-    def load_peak_mag(npz_path, fd_hz):
-        try:
-            d = np.load(npz_path)
-            idx = np.argmin(np.abs(d["frequency_Hz"] - fd_hz))
-            return float(d["magnitude"][idx])
-        except Exception:
-            return np.nan
-
-    raw["peak_mag"] = [load_peak_mag(r["npz_file"], r["fn_peak_Hz"])
-                       for _, r in raw.iterrows()]
-    raw = raw.dropna(subset=["peak_mag"])
-    raw = raw.dropna(subset=["log_spatial_slope"])
-    raw["orient"] = raw["date"].str.split("_").str[-1]
-
-    rows = []
-    for (rock, pct, orient), grp in raw.groupby(["rock", "burial_pct", "orient"]):
-        b = grp[grp["direction"] == "b"]
-        s = grp[grp["direction"] == "s"]
-        if len(b) == 0 or len(s) == 0:
-            continue
-
-        ax1 = grp["axis1_cm"].iloc[0]
-        ax2 = grp["axis2_cm"].iloc[0]
-        ax3 = grp["axis3_cm"].iloc[0]
-        Hs = grp["Hs_cm"].iloc[0]
-        h = grp["h_cm"].iloc[0]
-        M = grp["M_kg"].iloc[0]
-        density = (M * 1000.0) / (ax1 * ax2 * ax3)
-
-        fn_b = b["fn_avg_Hz"].mean()
-        fn_s = s["fn_avg_Hz"].mean()
-        Mp_b = b["peak_mag"].mean()
-        Mp_s = s["peak_mag"].mean()
-        zb = b["damping_ratio"].mean()
-        zs = s["damping_ratio"].mean()
-        beta_b = b["log_spatial_slope"].mean()
-        beta_s = s["log_spatial_slope"].mean()
-
-        # Sum / difference encoding
-        rows.append(dict(
-            rock=rock, pct=pct, date=orient,
-            axis1_cm=ax1, axis2_cm=ax2, ax3_cm=ax3,
-            he_cm=Hs, M_kg=M, density=density,
-            w_mean=(ax1 + ax2) / 2,
-            fn_mean=(fn_b + fn_s) / 2,
-            Mp_mean=(Mp_b + Mp_s) / 2,
-            he=Hs,
-            w_diff=ax2 - ax1,
-            fn_diff=fn_b - fn_s,
-            Mp_diff=Mp_b - Mp_s,
-            beta_mean=(beta_b + beta_s) / 2,
-            beta_diff=beta_b - beta_s,
-            zeta_mean=(zb + zs) / 2,
-            zeta_diff=zb - zs,
-            h_cm=h,
-        ))
-
-    return pd.DataFrame(rows)
 
 
 # ============================================================================
@@ -176,13 +110,14 @@ def run_loro(df, features, model_kwargs):
             loo_rows.append(dict(
                 rock=row["rock"], pct=row["pct"], date=row["date"],
                 h_true=row["h_cm"], h_pred=y_pred[i],
-                axis1_cm=row["axis1_cm"], axis2_cm=row["axis2_cm"],
+                area_cm2=row["area_cm2"],
                 he_cm=row["he_cm"], M_kg=row["M_kg"], density=row["density"],
             ))
 
     lr = pd.DataFrame(loo_rows)
-    lr["V_true_cm3"] = lr["axis1_cm"] * lr["axis2_cm"] * (lr["he_cm"] + lr["h_true"])
-    lr["V_pred_cm3"] = lr["axis1_cm"] * lr["axis2_cm"] * (lr["he_cm"] + lr["h_pred"])
+    # orientation-aware horizontal cross-sectional area (w_b * w_s)
+    lr["V_true_cm3"] = lr["area_cm2"] * (lr["he_cm"] + lr["h_true"])
+    lr["V_pred_cm3"] = lr["area_cm2"] * (lr["he_cm"] + lr["h_pred"])
     lr["h_err_pct"] = (lr["h_pred"] - lr["h_true"]) / lr["h_true"] * 100
     lr["V_err_pct"] = (lr["V_pred_cm3"] - lr["V_true_cm3"]) / lr["V_true_cm3"] * 100
     return lr
@@ -199,27 +134,29 @@ def compute_metrics(lr):
 # ============================================================================
 # Permutation importance
 # ============================================================================
-def permutation_importance(df, features, model_kwargs, n_repeats=20):
-    """Train on full dataset, then shuffle each feature."""
-    model = make_model(**model_kwargs)
-    model.fit(df[features].values, df[TARGET].values)
-
+def permutation_importance(df, features, model_kwargs, n_repeats=20,
+                           seeds=range(20)):
+    """Train on the full dataset (one model per seed), shuffle each feature,
+    and average the RMSE increase over shuffles and seeds (paper Sec. VII-C)."""
     X = df[features].values
     y = df[TARGET].values
-    base_rmse = np.sqrt(np.mean((model.predict(X) - y) ** 2))
-
     rng = np.random.default_rng(0)
-    importance = {}
-    for fi, fname in enumerate(features):
-        deltas = []
-        for _ in range(n_repeats):
-            Xs = X.copy()
-            rng.shuffle(Xs[:, fi])
-            rmse_s = np.sqrt(np.mean((model.predict(Xs) - y) ** 2))
-            deltas.append(rmse_s - base_rmse)
-        importance[fname] = np.mean(deltas)
-
-    return importance, base_rmse
+    deltas = {f: [] for f in features}
+    base_rmses = []
+    for seed in seeds:
+        kw = dict(model_kwargs, seed=seed)
+        model = make_model(**kw)
+        model.fit(X, y)
+        base = np.sqrt(np.mean((model.predict(X) - y) ** 2))
+        base_rmses.append(base)
+        for fi, fname in enumerate(features):
+            for _ in range(n_repeats):
+                Xs = X.copy()
+                rng.shuffle(Xs[:, fi])
+                rmse_s = np.sqrt(np.mean((model.predict(Xs) - y) ** 2))
+                deltas[fname].append(rmse_s - base)
+    importance = {f: float(np.mean(v)) for f, v in deltas.items()}
+    return importance, float(np.mean(base_rmses))
 
 
 # ============================================================================
@@ -299,17 +236,20 @@ def parse_args():
     )
     p.add_argument("--variant", default="+zeta+beta",
                    choices=list(VARIANTS.keys()) + ["all"],
-                   help="Feature set variant (default: +zeta+beta, the paper model)")
+                   help="Feature set variant (default: +zeta+beta, the proposed set)")
     p.add_argument("--csv", default=None,
                    help="Path to training_dataset.csv (default: ./training_dataset.csv)")
     p.add_argument("--output-dir", default=None,
                    help="Output directory for results CSV and figures (default: ./output)")
     p.add_argument("--alpha", type=float, default=5.0,
                    help="L2 regularization (default: 5.0)")
-    p.add_argument("--hidden-layers", type=int, nargs="+", default=[16, 8],
-                   help="Hidden layer sizes (default: 16 8)")
+    p.add_argument("--hidden-layers", type=int, nargs="+", default=[16, 8, 4],
+                   help="Hidden layer sizes (default: 16 8 4)")
     p.add_argument("--seed", type=int, default=0,
-                   help="Random seed (default: 0)")
+                   help="Seed for the detailed CSV/figures/permutation (default: 0)")
+    p.add_argument("--seeds", type=int, default=20,
+                   help="Number of seeds for the mean +/- std summary "
+                        "(Table II; default: 20; set 1 for a quick run)")
     p.add_argument("--no-plot", action="store_true",
                    help="Skip figure generation")
     return p.parse_args()
@@ -341,7 +281,7 @@ def main():
 
     # ── Load data ───────────────────────────────────────────────────────────
     print("Loading paired dataset ...", flush=True)
-    df = load_paired_dataset(csv_path)
+    df = load_paired(csv_path)
     print(f"  {len(df)} paired samples, {df['rock'].nunique()} rocks\n")
 
     # ── Select variants to run ──────────────────────────────────────────────
@@ -350,35 +290,41 @@ def main():
     else:
         run_variants = [(args.variant, VARIANTS[args.variant])]
 
-    # ── Run LORO ────────────────────────────────────────────────────────────
+    # ── Run LORO (all seeds in parallel per variant) ────────────────────────
     results = {}
     for name, feat in run_variants:
-        print(f"Running LORO: {name} ({len(feat)} inputs) ...", flush=True)
-        lr = run_loro(df, feat, model_kwargs)
-        results[name] = (lr, feat)
+        print(f"Running LORO: {name} ({len(feat)} inputs, "
+              f"{args.seeds} seed(s)) ...", flush=True)
+        lrs = Parallel(n_jobs=-1)(
+            delayed(run_loro)(df, feat, dict(model_kwargs, seed=s))
+            for s in range(args.seeds))
+        per = np.array([compute_metrics(lr) for lr in lrs])
+        detail = lrs[args.seed] if args.seed < args.seeds else \
+            run_loro(df, feat, dict(model_kwargs, seed=args.seed))
+        results[name] = (detail, feat, per)
 
-    # ── Summary table ───────────────────────────────────────────────────────
+    # ── Summary table (mean +/- std over seeds; paper Table II) ────────────
     print()
     print("=" * 70)
-    print("LORO Cross-Validation Summary")
+    print(f"LORO Cross-Validation Summary ({args.seeds} seeds)")
     print("=" * 70)
     print(f"  Architecture : {args.hidden_layers}  tanh  alpha={args.alpha}")
-    print(f"  Seed         : {args.seed}")
     print()
-    print(f"  {'Variant':<20} {'Inputs':>6} {'h MAPE':>8} {'h RMSE':>8} "
-          f"{'V MAPE':>8} {'V RMSE':>8}")
+    print(f"  {'Variant':<16} {'Inputs':>6} {'h MAPE (%)':>14} "
+          f"{'h RMSE (cm)':>14} {'V MAPE (%)':>13}")
     print("-" * 70)
 
-    best_name = min(results, key=lambda n: compute_metrics(results[n][0])[0])
-    for name, (lr, feat) in results.items():
-        hm, hr, Vm, Vr = compute_metrics(lr)
+    best_name = min(results, key=lambda n: results[n][2][:, 0].mean())
+    for name, (lr, feat, per) in results.items():
         flag = "  <-- BEST" if name == best_name and len(results) > 1 else ""
-        print(f"  {name:<20} {len(feat):6d} {hm:7.1f}% {hr:7.2f}cm "
-              f"{Vm:7.1f}% {Vr:7.1f}cm3{flag}")
+        print(f"  {name:<16} {len(feat):6d} "
+              f"{per[:, 0].mean():6.1f} +/- {per[:, 0].std():3.1f} "
+              f"{per[:, 1].mean():6.3f} +/- {per[:, 1].std():5.3f} "
+              f"{per[:, 2].mean():5.1f} +/- {per[:, 2].std():3.1f}{flag}")
 
     # ── Save results CSV ────────────────────────────────────────────────────
     print()
-    for name, (lr, feat) in results.items():
+    for name, (lr, feat, per) in results.items():
         tag = name.replace("+", "").replace(" ", "_")
         out_csv = output_dir / f"loro_results_{tag}.csv"
         lr.sort_values(["rock", "pct", "date"]).to_csv(out_csv, index=False)
@@ -389,7 +335,7 @@ def main():
     print("=" * 70)
     print("Permutation Feature Importance (trained on full data)")
     print("=" * 70)
-    for name, (lr, feat) in results.items():
+    for name, (lr, feat, per) in results.items():
         importance, base_rmse = permutation_importance(df, feat, model_kwargs)
         print(f"\n  {name} (base RMSE = {base_rmse:.3f} cm):")
         ranked = sorted(importance.items(), key=lambda x: -x[1])
@@ -402,7 +348,7 @@ def main():
     # ── Generate figure ─────────────────────────────────────────────────────
     if not args.no_plot:
         print()
-        # Use the paper model if available, otherwise the first result
+        # Use the proposed model if available, otherwise the first result
         plot_name = "+zeta+beta" if "+zeta+beta" in results else list(results.keys())[0]
         plot_lr = results[plot_name][0]
         hm, hr, Vm, Vr = compute_metrics(plot_lr)

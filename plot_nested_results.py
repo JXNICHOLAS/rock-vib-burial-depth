@@ -9,7 +9,7 @@ Regenerates the paper's nested-protocol figures from nested_cv.py output:
   output/error_vs_depth.png          — signed error vs depth with bias and
                                        95% limits-of-agreement lines (Fig. 5)
 
-Requires output/nested_preds_allseeds_meandiff.csv (run nested_cv.py first).
+Requires output/nested_preds_allseeds_meandiff11.csv (run nested_cv.py first).
 """
 import numpy as np
 import pandas as pd
@@ -23,7 +23,7 @@ from paired_dataset import load_paired
 
 BASE = Path(__file__).resolve().parent
 OUT = BASE / "output"
-PREDS = OUT / "nested_preds_allseeds_meandiff.csv"
+PREDS = OUT / "nested_preds_allseeds_meandiff11.csv"
 
 
 def mape(t, p):
@@ -64,11 +64,12 @@ def main():
     if not PREDS.exists():
         raise SystemExit(f"{PREDS} not found — run nested_cv.py first.")
     preds = pd.read_csv(PREDS)
-    dims = load_paired()[["rock", "pct", "date", "axis1_cm", "axis2_cm", "he_cm"]]
+    dims = load_paired()[["rock", "pct", "date", "area_cm2", "he_cm"]]
     preds = preds.merge(dims, on=["rock", "pct", "date"], how="left")
 
-    preds["V_true"] = preds.axis1_cm * preds.axis2_cm * (preds.he_cm + preds.h_true)
-    preds["V_pred"] = preds.axis1_cm * preds.axis2_cm * (preds.he_cm + preds.h_pred)
+    # orientation-aware horizontal cross-sectional area (w_b * w_s)
+    preds["V_true"] = preds.area_cm2 * (preds.he_cm + preds.h_true)
+    preds["V_pred"] = preds.area_cm2 * (preds.he_cm + preds.h_pred)
     s0 = preds[preds.seed == 0].copy()
 
     print(f"seed0 h: MAPE={mape(s0.h_true, s0.h_pred):.1f}%  RMSE={rmse(s0.h_true, s0.h_pred):.2f} cm")
@@ -86,7 +87,7 @@ def main():
         plt.close(fig)
         print(f"saved -> {OUT / fname}")
 
-    # error vs depth for a single trained model (seed 0), with
+    # error vs depth for a single seeded nested-CV evaluation (seed 0), with
     # Bland-Altman-style bias + limits of agreement (matches paper Fig. 5)
     s0["err"] = s0.h_pred - s0.h_true
     grp = s0.groupby(pd.qcut(s0.h_true, 4), observed=True)

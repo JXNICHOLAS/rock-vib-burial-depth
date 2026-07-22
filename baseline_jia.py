@@ -2,21 +2,21 @@
 """
 baseline_jia.py
 ===============
-Known-mass physics baseline (paper Table V, calibrated physics-baseline block).
+Known-mass physics baseline (paper Table V, calibrated physics-baseline row).
 
 Evaluates the closed-form inversion of the Jia et al. (2022) spring--mass
 model on the same strict LORO splits as the learned models, giving it every
 advantage the data-driven estimator does NOT receive:
   - the TRUE rock mass m of each block (the MLP never observes mass), and
-  - the soil-stiffness constant K = 4*pi^2/k fitted on the 15 training
+  - the soil-stiffness constant K = 4*pi^2/k fitted on the 17 training
     rocks of each fold (1-parameter fit minimizing training MAPE).
 
 Jia model:  h/m = 4 pi^2 fn^2 (a^2 + he^2) / [(1 - zeta^2) k b a^2]
 The geometric factor is averaged over both (a,b) cross-section orderings.
 
-Paper result: 47.0% MAPE / 2.45 cm RMSE — roughly twice the error of the
-mass-agnostic MLP, because strain-dependent soil stiffness breaks the
-assumed frequency-depth relationship (Section III).
+Paper result: 45.9% MAPE / 2.46 cm RMSE — nearly twice the error of the
+mass-agnostic MLP (25.1%), because strain-dependent soil stiffness breaks
+the assumed frequency-depth relationship (Section III).
 """
 import numpy as np
 import pandas as pd
@@ -31,7 +31,7 @@ def horizontal_dims(row):
     """Two horizontal cross-section dims (cm) for this orientation."""
     if row["date"] == "z":            # ax3 vertical -> horizontal = ax1, ax2
         return row["axis1_cm"], row["axis2_cm"]
-    return row["axis2_cm"], row["ax3_cm"]  # 'x': ax1 vertical
+    return row["axis2_cm"], row["axis3_cm"]  # 'x': ax1 vertical
 
 
 def jia_geom(row):

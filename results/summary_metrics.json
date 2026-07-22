@@ -1,0 +1,27 @@
+{
+  "what": "Synchronized index of the numbers reported in the paper tables (mean +/- std over seeds 0-19 unless noted), transcribed from the archived per-seed runs. Per-sample and per-fold evidence: the prediction and selection CSVs in this folder. Every entry is regenerable from the released scripts: nested rows via nested_cv.py, the fixed ablation via nn_LORO.py --variant all, alternative regressors via nested_alt_regressors.py, the physics baseline via baseline_jia.py, linear/polynomial/dummy via linear_baselines.py, the single-measurement benchmark via comparison/nn_single_dir.py, and the deployed configuration via nested_cv.py --deploy.",
+  "nested_meandiff11_proposed": "25.1 +/- 1.0 % / 0.938 +/- 0.026 cm",
+  "nested_meandiff9_damping_only": "25.8 +/- 0.9 % / 0.990 +/- 0.034 cm",
+  "nested_meandiff_beta9": "40.6 +/- 1.2 % / 1.651 +/- 0.045 cm",
+  "nested_raw11": "27.1 +/- 0.9 % / 1.074 +/- 0.047 cm",
+  "featureset_selector_adaptive": "26.0 +/- 0.8 % / 0.964 cm ; wins full11 10 / zeta9 8 / beta9 0",
+  "fixed_ablation_16_8_4_tanh_a5": {
+    "base7": "48.4 +/- 1.3 / 1.827",
+    "+zeta": "24.4 +/- 0.5 / 0.926",
+    "+beta": "37.6 +/- 1.6 / 1.645",
+    "+zeta+beta (proposed)": "22.6 +/- 0.8 / 0.881"
+  },
+  "single_measurement_7feat_fixed": "29.6 +/- 0.6 % / 1.279 +/- 0.024 cm",
+  "alt_regressors_nested_11feat": {
+    "GP": "39.6 +/- 0.0 / 1.387",
+    "RF": "45.2 +/- 0.3 / 1.571",
+    "GB": "40.6 +/- 0.8 / 1.509"
+  },
+  "linear_baselines_11feat": {
+    "linear": "31.6 / 1.29",
+    "poly2": "64.4 / 2.48"
+  },
+  "jia_known_mass_baseline": "45.9 % / 2.462 cm (predictions: baseline_jia_pred.csv)",
+  "deployed_config_inner_rule_all_18": "(4, 2) tanh alpha=3 (inner 23.6 %)",
+  "dummy_training_mean": "58.3 %"
+}

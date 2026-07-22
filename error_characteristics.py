@@ -5,7 +5,7 @@ error_characteristics.py
 Operational error analysis of the nested-protocol predictions (paper
 Section "Error Characteristics" and the error-vs-depth figure).
 
-Reads output/nested_preds_allseeds_meandiff.csv (produced by nested_cv.py)
+Reads output/nested_preds_allseeds_meandiff11.csv (produced by nested_cv.py)
 and reports: signed bias, MAE, RMSE, 95th-percentile and worst-case error,
 failure rates, and a per-burial-depth-quartile breakdown; saves the
 error-vs-depth figure.
@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
-PREDS = BASE / "output" / "nested_preds_allseeds_meandiff.csv"
+PREDS = BASE / "output" / "nested_preds_allseeds_meandiff11.csv"
 
 
 def main():
@@ -28,9 +28,10 @@ def main():
     d["err"] = d.h_pred - d.h_true
     d["abs_err"] = d.err.abs()
 
-    # Each metric is computed per seed (90 samples) and aggregated as
-    # mean +/- std over the 20 seeds, so that every value describes a single
-    # trained model rather than pooling correlated re-predictions.
+    # Each metric is computed per seed (102 samples) and aggregated as
+    # mean +/- std over the 20 seeds, so that every value describes one
+    # complete seeded nested-cross-validation evaluation rather than
+    # pooling correlated re-predictions.
     def per_seed(fn):
         vals = np.array([fn(g) for _, g in d.groupby("seed")])
         return vals.mean(), vals.std()
@@ -69,7 +70,7 @@ def main():
               f"{per[:,1].mean():+7.2f}+/-{per[:,1].std():4.2f} "
               f"{per[:,2].mean():6.2f}+/-{per[:,2].std():4.2f}")
 
-    # figure (paper Fig. 5): single trained model (seed 0) — scatter,
+    # figure (paper Fig. 5): single seeded nested-CV evaluation (seed 0) — scatter,
     # quartile mean +/- std, Bland-Altman-style bias and 95% LoA lines
     s0 = d[d.seed == 0]
     bias = s0.err.mean()
