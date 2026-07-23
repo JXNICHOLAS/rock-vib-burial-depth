@@ -51,6 +51,7 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # repo root
 from paired_dataset import load_paired, TARGET
 
 # ============================================================================
@@ -238,9 +239,9 @@ def parse_args():
                    choices=list(VARIANTS.keys()) + ["all"],
                    help="Feature set variant (default: +zeta+beta, the proposed set)")
     p.add_argument("--csv", default=None,
-                   help="Path to training_dataset.csv (default: ./training_dataset.csv)")
+                   help="Path to training_dataset.csv (default: training_dataset.csv at the repo root)")
     p.add_argument("--output-dir", default=None,
-                   help="Output directory for results CSV and figures (default: ./output)")
+                   help="Output directory for results CSV and figures (default: repo-root output/)")
     p.add_argument("--alpha", type=float, default=5.0,
                    help="L2 regularization (default: 5.0)")
     p.add_argument("--hidden-layers", type=int, nargs="+", default=[16, 8, 4],
@@ -257,7 +258,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    base = Path(__file__).resolve().parent
+    base = Path(__file__).resolve().parents[1]  # repo root
 
     csv_path = Path(args.csv) if args.csv else base / "training_dataset.csv"
     output_dir = Path(args.output_dir) if args.output_dir else base / "output"

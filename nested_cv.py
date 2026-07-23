@@ -24,7 +24,7 @@ Usage:
   python nested_cv.py --encoding meandiff_beta9  # spatial-only candidate
   python nested_cv.py --deploy                 # inner rule on ALL 18 rocks
                                                # -> named deployed config
-  (feature_set_selector.py assembles the paper's feature-set sensitivity
+  (analysis/feature_set_selector.py assembles the paper's feature-set selection
    analysis from the three meandiff runs; results/ ships canonical outputs)
 
 Outputs (to ./output/):
@@ -55,8 +55,8 @@ warnings.filterwarnings("ignore", category=ConvergenceWarning)
 BASE = Path(__file__).resolve().parent
 
 # meandiff9 / meandiff_beta9 / meandiff11 are the three candidate feature
-# sets of the paper's feature-set sensitivity analysis (assembled by
-# feature_set_selector.py); meandiff11 vs raw11 is the paper's input
+# sets of the paper's feature-set selection analysis (assembled by
+# analysis/feature_set_selector.py); meandiff11 vs raw11 is the paper's input
 # encoding comparison. raw9 is retained for completeness.
 ENCODINGS = {"raw9": FEAT_RAW9, "raw11": FEAT_RAW11,
              "meandiff9": FEAT_MEANDIFF9, "meandiff11": FEAT_MEANDIFF11,

@@ -15,7 +15,7 @@ Requires (run first):
   python nested_cv.py                      # meandiff11 (paper model)
   python nested_cv.py --encoding raw11
 
-Outputs (to ./output/):
+Outputs (to the repo-root output/):
   encoding_selection.csv           — per-fold winner and inner-score margin
   nested_preds_allseeds_encsel.csv — stitched outer predictions
 
@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-BASE = Path(__file__).resolve().parent
+BASE = Path(__file__).resolve().parents[1]  # repo root
 OUT = BASE / "output"
 
 

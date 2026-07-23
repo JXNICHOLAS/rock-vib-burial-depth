@@ -17,7 +17,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-BASE = Path(__file__).resolve().parent
+BASE = Path(__file__).resolve().parents[1]  # repo root
 PREDS = BASE / "output" / "nested_preds_allseeds_meandiff11.csv"
 
 

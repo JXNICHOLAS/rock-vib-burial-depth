@@ -15,7 +15,7 @@ Requires (run first):
   python nested_cv.py --encoding meandiff_beta9
   python nested_cv.py --encoding meandiff11
 
-Outputs (to ./output/):
+Outputs (to the repo-root output/):
   featureset_selection.csv           — per-fold winner and margins
   nested_preds_allseeds_fsel.csv     — stitched outer predictions
 
@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-BASE = Path(__file__).resolve().parent
+BASE = Path(__file__).resolve().parents[1]  # repo root
 OUT = BASE / "output"
 SETS = ("meandiff9", "meandiff_beta9", "meandiff11")
 

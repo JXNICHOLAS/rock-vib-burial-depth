@@ -2,9 +2,9 @@
 """
 paired_dataset.py
 =================
-Shared loader for the revision-experiment scripts (nested_cv.py,
-baseline_jia.py, nested_alt_regressors.py, error_characteristics.py,
-grid_search.py, permutation_importance.py, plot_nested_results.py).
+Shared loader for nested_cv.py and the analysis/ scripts (fixed-config
+ablation, physics and linear baselines, alternative regressors, grid
+search, and figure generation).
 
 Builds the 102-pair dataset (one row per rock/burial/orientation) with:
 

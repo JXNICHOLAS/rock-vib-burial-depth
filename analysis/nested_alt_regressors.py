@@ -28,11 +28,13 @@ from sklearn.model_selection import GroupKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # repo root
 from paired_dataset import load_paired, FEAT_MEANDIFF11, TARGET
 
 warnings.filterwarnings("ignore")
 
-BASE = Path(__file__).resolve().parent
+BASE = Path(__file__).resolve().parents[1]  # repo root
 NFEAT = len(FEAT_MEANDIFF11)
 SEL_SEED = 0
 OUTER_SEEDS = range(20)

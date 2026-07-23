@@ -19,9 +19,11 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from pathlib import Path
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # repo root
 from paired_dataset import load_paired
 
-BASE = Path(__file__).resolve().parent
+BASE = Path(__file__).resolve().parents[1]  # repo root
 OUT = BASE / "output"
 PREDS = OUT / "nested_preds_allseeds_meandiff11.csv"
 

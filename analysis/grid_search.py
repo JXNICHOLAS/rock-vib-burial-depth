@@ -35,11 +35,13 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # repo root
 from paired_dataset import load_paired, FEAT_MEANDIFF11, TARGET
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
-BASE = Path(__file__).resolve().parent
+BASE = Path(__file__).resolve().parents[1]  # repo root
 
 HIDDEN = [(8,), (12,),
           (4, 2), (6, 3), (8, 4), (10, 5), (12, 6), (16, 8), (20, 10), (24, 12),
