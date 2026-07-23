@@ -6,7 +6,7 @@ This repository contains the data and code for the paper:
 
 A geometry-informed, vibration-based pipeline estimates how deeply a rock is buried in granular soil. An instrumented hammer excites the rock in two orthogonal directions, a scanning laser Doppler vibrometer records the frequency response, and eleven physically interpretable features (cross-section width, exposed height, resonance frequency, peak mobility, half-power damping ratio, and spatial vibration decay slope, encoded as mean/difference pairs from the two strike directions) are mapped to burial depth by a Multilayer Perceptron.
 
-**Canonical results** (strict Leave-One-Rock-Out cross-validation on 18 concrete blocks; 102 paired samples from 204 measurements; seeds 0–19; hyperparameter selection confined to training folds, with the feature-set composition supported by a training-fold sensitivity analysis):
+**Canonical results** (strict Leave-One-Rock-Out cross-validation on 18 concrete blocks; 102 paired samples from 204 measurements; seeds 0–19; hyperparameter selection confined to training folds, with the feature-set composition supported by a training-fold feature-set selection analysis):
 
 | Protocol | h MAPE | h RMSE |
 |---|---|---|
@@ -14,7 +14,7 @@ A geometry-informed, vibration-based pipeline estimates how deeply a rock is bur
 | Nested selection, raw-pairs encoding (`nested_cv.py --encoding raw11`) | 27.1 ± 0.9% | 1.074 cm |
 | Fixed reference configuration (16,8,4)/tanh/α=5 (`nn_LORO.py`; used for matched relative comparisons only) | 22.6 ± 0.8% | 0.881 cm |
 
-The feature-set sensitivity analysis (`feature_set_selector.py`) selects the combined eleven-feature set in 10 of 18 outer folds and the damping-only set in 8, never the spatial-slope-only set; the deployed configuration named by applying the inner rule to all 18 rocks is (4,2)/tanh/α=3 (`nested_cv.py --deploy`). The known-mass closed-form inversion of Jia et al. (true mass supplied, per-fold calibrated soil constant) reaches 45.9% MAPE (`baseline_jia.py`). Under the same nested protocol with the same eleven inputs, Gaussian Process reaches 39.6%, Random Forest 45.2%, and Gradient Boosting 40.6% (`nested_alt_regressors.py`); deterministic linear regression (LORO evaluation, no hyperparameter selection) reaches 31.6%. The single-measurement benchmark at the fixed configuration is 29.6% (`comparison/nn_single_dir.py`); the encoding comparison is assembled by `encoding_selector.py` (requires the meandiff11 and raw11 runs).
+The training-fold feature-set selection analysis (`feature_set_selector.py`) selects the combined eleven-feature set in 10 of 18 outer folds and the damping-only set in 8, never the spatial-slope-only set; the deployed configuration named by applying the inner rule to all 18 rocks is (4,2)/tanh/α=3 (`nested_cv.py --deploy`). The known-mass closed-form inversion of Jia et al. (true mass supplied, per-fold calibrated soil constant) reaches 45.9% MAPE (`baseline_jia.py`). Under the same nested protocol with the same eleven inputs, Gaussian Process reaches 39.6%, Random Forest 45.2%, and Gradient Boosting 40.6% (`nested_alt_regressors.py`); deterministic linear regression (LORO evaluation, no hyperparameter selection) reaches 31.6%. The single-measurement benchmark at the fixed configuration is 29.6% (`comparison/nn_single_dir.py`); the encoding comparison is assembled by `encoding_selector.py` (requires the meandiff11 and raw11 runs).
 
 ## Repository Structure
 
@@ -29,7 +29,7 @@ rock-vib-burial-depth/
 ├── paired_dataset.py                      # Shared loader (orientation-aware widths, both encodings)
 ├── nested_cv.py                           # Nested CV (paper headline; encodings meandiff11/raw11/meandiff9/meandiff_beta9/raw9; --deploy)
 ├── encoding_selector.py                   # Nested encoding comparison (meandiff11 vs raw11) from nested_cv.py outputs
-├── feature_set_selector.py                # Feature-set sensitivity analysis (288 candidates/fold) from nested_cv.py outputs
+├── feature_set_selector.py                # Feature-set selection analysis (288 candidates/fold) from nested_cv.py outputs
 ├── results/                               # Canonical artifacts backing the paper: selection tables + per-sample predictions
 ├── grid_search.py                         # 96-config screening search (see bias caveat in file)
 ├── baseline_jia.py                        # Known-mass closed-form physics baseline (Table V)
@@ -113,7 +113,7 @@ python nested_cv.py
 # Raw-pairs encoding comparison under the same nested protocol:
 python nested_cv.py --encoding raw11
 
-# Feature-set candidates for the sensitivity analysis:
+# Feature-set candidates for the selection analysis:
 python nested_cv.py --encoding meandiff9
 python nested_cv.py --encoding meandiff_beta9
 
