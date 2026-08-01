@@ -6,6 +6,10 @@ This repository contains the data and code for the paper:
 
 A geometry-informed, vibration-based pipeline estimates how deeply a rock is buried in granular soil. An instrumented hammer excites the rock in two orthogonal directions, a scanning laser Doppler vibrometer records the frequency response, and eleven physically interpretable features (cross-section width, exposed height, resonance frequency, peak mobility, half-power damping ratio, and spatial vibration decay slope, encoded as mean/difference pairs from the two strike directions) are mapped to burial depth by a Multilayer Perceptron.
 
+![Specimen r19 in both test orientations, on both strike faces, at three burial levels](images/specimen_burial_matrix.jpg)
+
+*Measurement matrix for one specimen. Because the vertical dimension differs between the two orientations, the same burial percentage yields different absolute depths, which is how testing two orientations per block widens the dataset without fabricating additional specimens. As burial increases the exposed face shrinks and fewer scan points fit on it; that change in the sampled mode shape is what the spatial log-slope feature captures.*
+
 **Canonical results** (strict Leave-One-Rock-Out cross-validation on 18 concrete blocks; 102 paired samples from 204 measurements; seeds 0–19; hyperparameter selection confined to training folds, with the feature-set composition supported by a training-fold feature-set selection analysis):
 
 | Protocol | h MAPE | h RMSE |
